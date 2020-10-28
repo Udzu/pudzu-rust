@@ -59,7 +59,8 @@ class MarkovGenerator(object):
         while True:
             word = self.render(lambda o: len(o) > 1 and o[-1] == " ", lambda n: n[0] == " ")
             if min_length <= len(word.strip()) <= max_length:
-                return word.strip()
+                to_strip = " " + "".join(c for c in word if unicodedata.category(c).startswith("P"))
+                return word.strip(to_strip)
 
 
 if __name__ == "__main__":
