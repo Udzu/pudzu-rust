@@ -4,7 +4,9 @@ use std::io::{self, prelude::*, BufReader};
 use std::iter::Iterator;
 
 fn main() -> io::Result<()> {
-    let file = File::open("foo.txt")?;
+    let args: Vec<String> = std::env::args().collect();
+    let filename = &args.get(1).expect("Missing filename argument");
+    let file = File::open(filename)?;
     let reader = BufReader::new(file);
     let mut frequencies: HashMap<char, HashMap<char, u32>> = HashMap::new();
     for line in reader.lines() {
@@ -12,7 +14,8 @@ fn main() -> io::Result<()> {
         let bigram_it = bigrams(line.chars());
         bigram_frequencies(bigram_it, &mut frequencies);
     }
-    println!("{:?}", frequencies);
+    let serialised = serde_json::to_string(&frequencies).unwrap();
+    println!("{}", serialised);
     Ok(())
 }
 
