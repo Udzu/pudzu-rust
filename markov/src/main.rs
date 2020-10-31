@@ -14,7 +14,7 @@ fn main() -> io::Result<()> {
         let bigrams = line.chars().bigrams();
         bigram_frequencies(bigrams, &mut frequencies);
     }
-    let serialised = serde_json::to_string(&frequencies).unwrap();
+    let serialised = serde_json::to_string(&frequencies)?;
     println!("{}", serialised);
     Ok(())
 }
