@@ -1,7 +1,8 @@
+use itertools::{Itertools, Tee};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, prelude::*, BufReader};
-use std::iter::Iterator;
+use std::iter::{Iterator, Zip};
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -11,7 +12,7 @@ fn main() -> io::Result<()> {
     let mut frequencies: HashMap<char, HashMap<char, u32>> = HashMap::new();
     for line in reader.lines() {
         let line = line?;
-        let bigrams = line.chars().bigrams();
+        let bigrams = line.chars().bigrams_tee();
         bigram_frequencies(bigrams, &mut frequencies);
     }
     let serialised = serde_json::to_string(&frequencies)?;
@@ -43,14 +44,26 @@ impl<T: std::clone::Clone, I: Iterator<Item = T>> Iterator for BiGramIterator<T,
     }
 }
 
-// bigram trait to extend iterators
-trait BiGrams<T: std::clone::Clone, I: Iterator<Item = T>> : Iterator<Item = T> {
+trait BiGrams<T: std::clone::Clone, I: Iterator<Item = T>>: Iterator<Item = T> {
     fn bigrams(self) -> BiGramIterator<T, I>;
 }
 
 impl<T: std::clone::Clone, I: Iterator<Item = T>> BiGrams<T, I> for I {
     fn bigrams(self) -> BiGramIterator<T, I> {
         BiGramIterator::new(self)
+    }
+}
+
+// bigram iterator (teeing approach)
+trait BiGramsZip<T: std::clone::Clone, I: Iterator<Item = T>>: Iterator<Item = T> {
+    fn bigrams_tee(self) -> Zip<Tee<I>, Tee<I>>;
+}
+
+impl<T: std::clone::Clone, I: Iterator<Item = T>> BiGramsZip<T, I> for I {
+    fn bigrams_tee(self) -> Zip<Tee<I>, Tee<I>> {
+        let (a, mut b) = self.tee();
+        b.next();
+        a.zip(b)
     }
 }
 
