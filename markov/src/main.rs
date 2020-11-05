@@ -14,6 +14,9 @@ fn main() -> io::Result<()> {
         let line = line?;
         let bigrams = line.chars().bigrams_tee();
         bigram_frequencies(bigrams, &mut frequencies);
+        // TODO: switch to ngrams
+        // let ngrams : Vec<Vec<char>> = line.chars().ngrams(1).collect();
+        // println!("{:#?}", ngrams);
     }
     let serialised = serde_json::to_string(&frequencies)?;
     println!("{}", serialised);
@@ -75,5 +78,37 @@ fn bigram_frequencies<T: std::cmp::Eq + std::hash::Hash>(
     for (a, b) in items {
         let d = frequencies.entry(a).or_insert(HashMap::new());
         *d.entry(b).or_insert(0) += 1;
+    }
+}
+
+// ngrams
+struct ZipVec<T, I: Iterator<Item = T>>(Vec<I>);
+
+impl<T: std::clone::Clone, I: Iterator<Item = T>> Iterator for ZipVec<T, I>
+{
+    type Item = Vec<T>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.iter_mut().map(Iterator::next).collect()
+    }
+}
+
+trait NGrams<T: std::clone::Clone, I: Iterator<Item = T>>: Iterator<Item = T> {
+    fn tee_n(self, n: u8) -> Vec<Tee<I>>;
+    fn ngrams(self, n: u8) -> ZipVec<T, Tee<I>>;
+}
+
+impl<T: std::clone::Clone, I: Iterator<Item = T>> NGrams<T, I> for I {
+    fn tee_n(self, _n: u8) -> Vec<Tee<I>> {
+        let vec: Vec<Tee<I>> = Vec::new();
+        // TODO: populate using tee
+        vec
+    }
+
+    fn ngrams(self, n: u8) -> ZipVec<T, Tee<I>> {
+        let mut tees = self.tee_n(n);
+        for (i, tee) in (&mut tees).iter_mut().skip(0).enumerate() {
+            tee.nth(i);
+        }
+        ZipVec(tees)
     }
 }
