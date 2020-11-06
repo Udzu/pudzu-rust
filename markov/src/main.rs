@@ -1,28 +1,69 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs::File;
+use std::path::PathBuf;
 use std::io::{self, prelude::*, BufReader};
 use std::iter::Iterator;
+use structopt::StructOpt;
+
+#[derive(StructOpt)]
+#[structopt(about = "Thingy for markov whatsits")]
+struct Opts {
+    /// Input file
+    #[structopt(name = "FILE", parse(from_os_str))]
+    file: PathBuf,
+    /// The 'n' in ngram
+    #[structopt(short, default_value="1")]
+    n: usize
+}
 
 fn main() -> io::Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    let filename = &args.get(1).expect("Missing filename argument, fool!");
-    let n = args
-        .get(2)
-        .unwrap_or(&String::from("1"))
-        .parse::<u8>()
-        .expect("Bad ngram n value, fool!");
-    let file = File::open(filename)?;
+    let opts = Opts::from_args();
+    let file = File::open(opts.file)?;
     let reader = BufReader::new(file);
     let mut frequencies: HashMap<String, HashMap<char, u32>> = HashMap::new();
     for line in reader.lines() {
         let line = line?;
-        let ngrams = line.chars().ngrams(n);
+        let ngrams = OverlappingWindows::new(line.chars(), opts.n);
         ngram_frequencies(ngrams, &mut frequencies);
     }
     let serialised = serde_json::to_string(&frequencies)?;
     println!("{}", serialised);
     Ok(())
+}
+
+// Use "multipeek" to produce overlapping windows of values and use these as ngrams.
+struct OverlappingWindows<I: Iterator<Item = T>, T> {
+    window_size: usize,
+    iterator: itertools::structs::MultiPeek<I>
+}
+
+impl <I: Iterator<Item = T>, T: Clone> OverlappingWindows<I, T> {
+    pub fn new(iterator: I, window_size: usize) -> OverlappingWindows<I, T> {
+        OverlappingWindows {
+            window_size,
+            iterator: itertools::multipeek(iterator)
+        }
+    }
+}
+
+impl <I: Iterator<Item = T>, T: Clone> Iterator for OverlappingWindows<I, T> {
+    type Item = Vec<T>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut out = Vec::with_capacity(self.window_size);
+        while out.len() < self.window_size {
+            if let Some(val) = self.iterator.peek() {
+                out.push(val.clone())
+            } else {
+                return None
+            }
+        }
+        // Could optimise by not throwing away next() call,
+        // but it's easier just peeking up to "n" than doing
+        // a next(0 and then n-1 peeks())
+        self.iterator.next();
+        Some(out)
+    }
 }
 
 // ngrams
